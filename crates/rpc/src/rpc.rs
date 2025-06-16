@@ -97,14 +97,14 @@ impl KoraRpc {
     }
 
     pub async fn transfer_transaction(
-        &self,
-        request: TransferTransactionRequest,
-    ) -> Result<TransferTransactionResponse, KoraError> {
-        info!("Transfer transaction request: {:?}", request);
-        let result = transfer_transaction(&self.rpc_client, &self.validation, request).await;
-        info!("Transfer transaction response: {:?}", result);
-        result
-    }
+    &self,
+    request: TransferTransactionRequest,
+) -> Result<TransferTransactionResponse, KoraError> {
+    info!("Transfer transaction request: {:?}", request);
+    let result = transfer_transaction(&self.rpc_client, &self.validation, request).await;
+    info!("Transfer transaction response: {:?}", result);
+    result
+}
 
     pub async fn get_blockhash(&self) -> Result<GetBlockhashResponse, KoraError> {
         info!("Get blockhash request received");
