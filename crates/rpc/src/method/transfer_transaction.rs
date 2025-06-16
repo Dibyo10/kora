@@ -91,50 +91,39 @@ pub async fn transfer_transaction(
             .map_err(|_| KoraError::AccountNotFound(source_ata.to_string()))?;
 
         if rpc_client.get_account(&dest_ata).await.is_err() {
-            instructions.push(token_program.create_associated_token_account_instruction(
+            let create_ata_ix = token_program.create_associated_token_account_instruction(
                 &fee_payer,
                 &destination,
                 &token_mint,
-            ));
+            );
+            instructions.push(create_ata_ix);
         }
 
-        instructions.push(
-            token_program
-                .create_transfer_checked_instruction(
-                    &source_ata,
-                    &token_mint,
-                    &dest_ata,
-                    &source,
-                    request.amount,
-                    decimals,
-                )
-                .map_err(|e| {
-                    KoraError::InvalidTransaction(format!(
-                        "Failed to create transfer instruction: {}",
-                        e
-                    ))
-                })?,
-        );
+        let transfer_ix = token_program
+            .create_transfer_checked_instruction(
+                &source_ata,
+                &token_mint,
+                &dest_ata,
+                &source,
+                request.amount,
+                decimals,
+            )
+            .map_err(|e| KoraError::ValidationError(format!("Transfer ix error: {:?}", e)))?;
+
+        instructions.push(transfer_ix);
     }
 
-    let blockhash =
-        rpc_client.get_latest_blockhash_with_commitment(CommitmentConfig::finalized()).await?;
+    let blockhash = rpc_client
+        .get_latest_blockhash()
+        .await
+        .map_err(|e| KoraError::RpcError(e.to_string()))?;
 
-    let message = Message::new_with_blockhash(&instructions, Some(&fee_payer), &blockhash.0);
-    let mut transaction = Transaction::new_unsigned(message);
-
-    // validate transaction before signing
-    validator.validate_transaction(&transaction)?;
-
-    let signature = signer.sign_solana(&transaction.message_data()).await?;
-    transaction.signatures[0] = signature;
-
-    let encoded = encode_b64_transaction(&transaction)?;
-    let message_encoded = encode_b64_message(&transaction.message)?;
+    let message = Message::new(&instructions, Some(&fee_payer));
+    let transaction = Transaction::new_unsigned(message);
 
     Ok(TransferTransactionResponse {
-        transaction: encoded,
-        message: message_encoded,
-        blockhash: blockhash.0.to_string(),
+        transaction: encode_b64_transaction(&transaction)?,
+        message: encode_b64_message(&transaction.message)?,
+        blockhash: blockhash.to_string(),
     })
 }
